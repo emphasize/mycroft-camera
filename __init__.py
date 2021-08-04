@@ -26,6 +26,7 @@ class CameraSkill(MycroftSkill):
     def __init__(self):
         super(CameraSkill, self).__init__("CameraSkill")
         self.camera_mode = None
+        self.cams = self.config_core.get("cams", {})
         self.save_folder = os.path.expanduser("~/Pictures")
         if not os.path.isdir(self.save_folder):
             os.makedirs(self.save_folder)
@@ -85,7 +86,7 @@ class CameraSkill(MycroftSkill):
 
     def handle_camera_activity(self, activity):
         """Perform camera action.
-        
+
         Arguments:
             activity (str): the type of action to take, one of:
                 "generic" - open the camera app
@@ -96,7 +97,21 @@ class CameraSkill(MycroftSkill):
             self.gui["singleshot_mode"] = True
         if activity == "generic":
             self.gui["singleshot_mode"] = False
-        self.gui.show_page("Camera.qml", override_idle=60)
+        self.gui.show_page("Camera.qml", override_idle=True,
+                           override_animations=True)
+
+    @intent_handler("stream.intent")
+    def handle_get_stream(self, message):
+        cam_name = message.data.get("cam")
+        if not cam_name:
+            self.speak_dialog("stream.not_specified")
+            return
+        self.cam = self.cams.get(cam_name, None)
+        if not self.cam:
+            self.speak_dialog("stream.no_config", data={"cam": cam_name})
+            return
+        else:
+            self.gui.show_url(self.cam, override_idle=60)
 
     def stop(self):
         """Respond to system stop command."""
