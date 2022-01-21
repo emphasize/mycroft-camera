@@ -38,12 +38,11 @@ class CameraSkill(MycroftSkill):
     def initialize(self):
         """Perform any initial setup."""
         # Register Camera GUI Events
-        self.gui.register_handler(
-            "CameraSkill.ViewPortStatus", self.handle_camera_status
-        )
-        self.gui.register_handler(
-            "CameraSkill.EndProcess", self.handle_camera_completed
-        )
+        self.gui.register_handler("CameraSkill.ViewPortStatus", self.handle_camera_status)
+        self.gui.register_handler("CameraSkill.EndProcess", self.handle_camera_completed)
+
+        # Register Bus Events
+        self.bus.on("skill.camera.showcam", self.handle_stream)
         # register cam names for adapt
         for word in self.cams.keys():
             self.register_vocabulary(word, "location")
@@ -179,27 +178,37 @@ class CameraSkill(MycroftSkill):
             if not cam_name:
                 self.speak_dialog("stream.not_specified")
                 return
-            cam = self.cams.get(cam_name, None)
-            if not cam:
+
+            cam_url = self.cams.get(cam_name, None)
+            if not cam_url:
                 self.speak_dialog("stream.no_config", data={"cam": cam_name})
                 return
             else:
-                # determine if we have to have to standby the disp afterwards
-                _display_status_code = \
-                    self.remote.GetDevicePowerStatus(self.display_id)
-                self.display_status = \
-                    self.remote.PowerStatusToString(_display_status_code)
-                self.log.debug(f"Display Status: {self.display_status}")
-                # make it the active source, this is causing
-                # 1) turn on display on input source (HDMI/..) or
-                # 2) switch to HDMI/... if the diaplay is already on
-                if self.remote.SetActiveSource(cec.CEC_DEVICE_TYPE_RESERVED):
-                    self.gui.show_url(cam, override_idle=idle)
-                if idle is not True:
-                    sleep(idle-2)
-                    self.handle_camera_completed()
+                self.show_stream(cam_url, idle)
         else:
             self.speak_dialog("display.not.available")
+
+    # stream called based on a bus message (the message utterance value must equal to the cam url key)
+    def handle_stream(self, message, idle=60):
+        cam_name = message.get("utterance")
+        cam_url = self.cams.get(cam_name, None)
+        self.show_stream(cam_url, idle)
+
+    def show_stream(self, cam_url, idle):
+        # determine if we have to have to standby the disp afterwards
+        _display_status_code = \
+            self.remote.GetDevicePowerStatus(self.display_id)
+        self.display_status = \
+            self.remote.PowerStatusToString(_display_status_code)
+        self.log.debug(f"Display Status: {self.display_status}")
+        # make it the active source, this is causing
+        # 1) turn on display on input source (HDMI/..) or
+        # 2) switch to HDMI/... if the diaplay is already on
+        if self.remote.SetActiveSource(cec.CEC_DEVICE_TYPE_RESERVED):
+            self.gui.show_url(cam_url, override_idle=idle)
+        if idle is not True:
+            sleep(idle-2)
+            self.handle_camera_completed()
 
     def stop(self):
         """Respond to system stop command."""
