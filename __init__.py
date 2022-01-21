@@ -190,7 +190,7 @@ class CameraSkill(MycroftSkill):
 
     # stream called based on a bus message (the message utterance value must equal to the cam url key)
     def handle_stream(self, message, idle=60):
-        cam_name = message.get("utterance")
+        cam_name = message.data.get("utterance")
         cam_url = self.cams.get(cam_name, None)
         self.show_stream(cam_url, idle)
 
